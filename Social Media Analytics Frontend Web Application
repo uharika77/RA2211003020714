@@ -1,0 +1,124 @@
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import { BrowserRouter as Router, Route, Routes, Link } from "react-router-dom";
+
+const API_BASE = "http://20.244.56.144/test";
+
+const TopUsers = () => {
+  const [users, setUsers] = useState([]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const { data } = await axios.get(`${API_BASE}/users`);
+      const usersData = Object.entries(data.users);
+      let userPostsCount = [];
+
+      for (let [id, name] of usersData) {
+        const posts = await axios.get(`${API_BASE}/users/${id}/posts`);
+        userPostsCount.push({ id, name, count: posts.data.posts.length });
+      }
+      userPostsCount.sort((a, b) => b.count - a.count);
+      setUsers(userPostsCount.slice(0, 5));
+    };
+    fetchUsers();
+  }, []);
+
+  return (
+    <div className="p-5">
+      <h2 className="text-xl font-bold">Top 5 Users with Most Posts</h2>
+      <ul>
+        {users.map((user) => (
+          <li key={user.id}>{user.name} - {user.count} posts</li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+const TrendingPosts = () => {
+  const [posts, setPosts] = useState([]);
+
+  useEffect(() => {
+    const fetchTrendingPosts = async () => {
+      let allPosts = [];
+      let postCommentCounts = {};
+      const users = await axios.get(`${API_BASE}/users`);
+
+      for (let id of Object.keys(users.data.users)) {
+        const { data } = await axios.get(`${API_BASE}/users/${id}/posts`);
+        allPosts.push(...data.posts);
+      }
+
+      for (let post of allPosts) {
+        const comments = await axios.get(`${API_BASE}/posts/${post.id}/comments`);
+        postCommentCounts[post.id] = comments.data.comments.length;
+      }
+
+      let maxComments = Math.max(...Object.values(postCommentCounts));
+      let trending = allPosts.filter(post => postCommentCounts[post.id] === maxComments);
+
+      setPosts(trending);
+    };
+    fetchTrendingPosts();
+  }, []);
+
+  return (
+    <div className="p-5">
+      <h2 className="text-xl font-bold">Trending Posts</h2>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.id}>{post.content} - {post.id}</li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+const Feed = () => {
+  const [posts, setPosts] = useState([]);
+
+  useEffect(() => {
+    const fetchFeed = async () => {
+      let allPosts = [];
+      const users = await axios.get(`${API_BASE}/users`);
+
+      for (let id of Object.keys(users.data.users)) {
+        const { data } = await axios.get(`${API_BASE}/users/${id}/posts`);
+        allPosts.push(...data.posts);
+      }
+      allPosts.sort((a, b) => b.id - a.id);
+      setPosts(allPosts);
+    };
+    fetchFeed();
+  }, []);
+
+  return (
+    <div className="p-5">
+      <h2 className="text-xl font-bold">Live Feed</h2>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.id}>{post.content}</li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+const App = () => {
+  return (
+    <Router>
+      <nav className="p-4 bg-blue-500 text-white">
+        <Link className="m-2" to="/">Feed</Link>
+        <Link className="m-2" to="/top-users">Top Users</Link>
+        <Link className="m-2" to="/trending-posts">Trending Posts</Link>
+      </nav>
+      <Routes>
+        <Route path="/" element={<Feed />} />
+        <Route path="/top-users" element={<TopUsers />} />
+        <Route path="/trending-posts" element={<TrendingPosts />} />
+      </Routes>
+    </Router>
+  );
+};
+
+export default App;
